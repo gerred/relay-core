@@ -129,7 +129,7 @@ const (
 	// example, any secret references must be resolvable.
 	TenantEventSinkReady TenantConditionType = "EventSinkReady"
 
-	// TenantNamespaceReady indicates whether the volume claim requested by the
+	// TenantVolumeClaimReady indicates whether the volume claim requested by the
 	// tenant volume claim template is ready to use.
 	TenantVolumeClaimReady TenantConditionType = "VolumeClaimReady"
 
