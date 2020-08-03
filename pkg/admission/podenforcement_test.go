@@ -38,6 +38,10 @@ func (ts testServerInjectorHandler) InjectFunc(f inject.Func) error {
 }
 
 func TestPodEnforcementHandler(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 

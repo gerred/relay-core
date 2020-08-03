@@ -3,6 +3,9 @@ package obj
 import (
 	"context"
 
+	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	nebulav1 "github.com/puppetlabs/relay-core/pkg/apis/nebula.puppet.com/v1"
 	"github.com/puppetlabs/relay-core/pkg/model"
 	tektonv1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
@@ -44,43 +47,123 @@ func ConfigureTask(ctx context.Context, t *Task, wrd *WorkflowRunDeps, ws *nebul
 		image = model.DefaultImage
 	}
 
-	step := tektonv1beta1.Step{
-		Container: corev1.Container{
-			Name:            "step",
-			Image:           image,
-			ImagePullPolicy: corev1.PullAlways,
-			Env: []corev1.EnvVar{
-				{
-					Name:  "METADATA_API_URL",
-					Value: wrd.MetadataAPIURL.String(),
+	if wrd.WorkflowRun.Object.Spec.TenantRef != nil {
+		ref, err := name.ParseReference(ws.Image, name.WeakValidation)
+		if err != nil {
+			return err
+		}
+
+		img, err := remote.Image(ref)
+		if err != nil {
+			return err
+		}
+
+		ep, cmd, _, err := imageData(ref, img)
+		if err != nil {
+			return err
+		}
+
+		var args []string
+		var argsForEntrypoint []string
+
+		if len(ep) > 0 {
+			argsForEntrypoint = append(argsForEntrypoint, "-entrypoint", ep[0], "--")
+			args = append(ep[1:], args...)
+			args = append(cmd[0:], args...)
+			argsForEntrypoint = append(argsForEntrypoint, args...)
+		} else {
+			argsForEntrypoint = append(argsForEntrypoint, "-entrypoint", cmd[0], "--")
+			args = append(cmd[1:], args...)
+			argsForEntrypoint = append(argsForEntrypoint, args...)
+		}
+
+		step := tektonv1beta1.Step{
+			Container: corev1.Container{
+				Name:            "step",
+				Image:           image,
+				ImagePullPolicy: corev1.PullAlways,
+				Command:         []string{"/data/entrypoint"},
+				Args:            argsForEntrypoint,
+				Env: []corev1.EnvVar{
+					{
+						Name:  "METADATA_API_URL",
+						Value: wrd.MetadataAPIURL.String(),
+					},
+				},
+				SecurityContext: &corev1.SecurityContext{
+					// We can't use RunAsUser et al. here because they don't allow write
+					// access to the container filesystem. Eventually, we'll use gVisor
+					// to protect us here.
+					AllowPrivilegeEscalation: func(b bool) *bool { return &b }(false),
+				},
+				VolumeMounts: []corev1.VolumeMount{
+					{
+						Name:      "entrypoint",
+						MountPath: "/data",
+						ReadOnly:  true,
+					},
 				},
 			},
-			SecurityContext: &corev1.SecurityContext{
-				// We can't use RunAsUser et al. here because they don't allow write
-				// access to the container filesystem. Eventually, we'll use gVisor
-				// to protect us here.
-				AllowPrivilegeEscalation: func(b bool) *bool { return &b }(false),
+		}
+
+		if err := wrd.AnnotateStepToken(ctx, &t.Object.ObjectMeta, ws); err != nil {
+			return err
+		}
+
+		t.Object.Spec.Steps = []tektonv1beta1.Step{step}
+
+		claim := wrd.WorkflowRun.Object.Spec.TenantRef.Name + "-volume-rox"
+		t.Object.Spec.Volumes = []corev1.Volume{
+			{
+				Name: "entrypoint",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: claim,
+						ReadOnly:  true,
+					},
+				},
 			},
-		},
-	}
-
-	if len(ws.Input) > 0 {
-		step.Script = model.ScriptForInput(ws.Input)
+		}
 	} else {
-		if len(ws.Command) > 0 {
-			step.Container.Command = []string{ws.Command}
+
+		step := tektonv1beta1.Step{
+			Container: corev1.Container{
+				Name:            "step",
+				Image:           image,
+				ImagePullPolicy: corev1.PullAlways,
+				Env: []corev1.EnvVar{
+					{
+						Name:  "METADATA_API_URL",
+						Value: wrd.MetadataAPIURL.String(),
+					},
+				},
+				SecurityContext: &corev1.SecurityContext{
+					// We can't use RunAsUser et al. here because they don't allow write
+					// access to the container filesystem. Eventually, we'll use gVisor
+					// to protect us here.
+					AllowPrivilegeEscalation: func(b bool) *bool { return &b }(false),
+				},
+			},
 		}
 
-		if len(ws.Args) > 0 {
-			step.Container.Args = ws.Args
+		if len(ws.Input) > 0 {
+			step.Script = model.ScriptForInput(ws.Input)
+		} else {
+			if len(ws.Command) > 0 {
+				step.Container.Command = []string{ws.Command}
+			}
+
+			if len(ws.Args) > 0 {
+				step.Container.Args = ws.Args
+			}
 		}
-	}
 
-	if err := wrd.AnnotateStepToken(ctx, &t.Object.ObjectMeta, ws); err != nil {
-		return err
-	}
+		if err := wrd.AnnotateStepToken(ctx, &t.Object.ObjectMeta, ws); err != nil {
+			return err
+		}
 
-	t.Object.Spec.Steps = []tektonv1beta1.Step{step}
+		t.Object.Spec.Steps = []tektonv1beta1.Step{step}
+	}
 
 	return nil
 }
@@ -154,4 +237,23 @@ func ConfigureTasks(ctx context.Context, ts *Tasks) error {
 	}
 
 	return nil
+}
+
+func imageData(ref name.Reference, img v1.Image) ([]string, []string, name.Digest, error) {
+	digest, err := img.Digest()
+	if err != nil {
+		return nil, nil, name.Digest{}, err
+	}
+
+	cfg, err := img.ConfigFile()
+	if err != nil {
+		return nil, nil, name.Digest{}, err
+	}
+
+	d, err := name.NewDigest(ref.Context().String()+"@"+digest.String(), name.WeakValidation)
+	if err != nil {
+		return nil, nil, name.Digest{}, err
+	}
+
+	return cfg.Config.Entrypoint, cfg.Config.Cmd, d, nil
 }

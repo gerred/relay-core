@@ -64,6 +64,10 @@ func assertWebhookTriggerResponseContains(t *testing.T, ctx context.Context, exp
 }
 
 func TestWebhookTriggerServesResponse(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
@@ -109,6 +113,10 @@ func TestWebhookTriggerServesResponse(t *testing.T) {
 }
 
 func TestWebhookTriggerScript(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
@@ -154,6 +162,10 @@ func TestWebhookTriggerScript(t *testing.T) {
 }
 
 func TestWebhookTriggerHasAccessToMetadataAPI(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
@@ -307,6 +319,10 @@ func TestWebhookTriggerHasAccessToMetadataAPI(t *testing.T) {
 }
 
 func TestWebhookTriggerTenantUpdatePropagation(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
@@ -384,6 +400,10 @@ func TestWebhookTriggerTenantUpdatePropagation(t *testing.T) {
 }
 
 func TestWebhookTriggerDeletionAfterTenantDeletion(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
@@ -434,10 +454,15 @@ func TestWebhookTriggerDeletionAfterTenantDeletion(t *testing.T) {
 }
 
 func TestWebhookTriggerKnativeRevisions(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	WithConfig(t, ctx, []ConfigOption{
+		ConfigWithTenantReconciler,
 		ConfigWithWebhookTriggerReconciler,
 	}, func(cfg *Config) {
 		tn := &relayv1beta1.Tenant{

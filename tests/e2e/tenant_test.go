@@ -6,18 +6,25 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	relayv1beta1 "github.com/puppetlabs/relay-core/pkg/apis/relay.sh/v1beta1"
 	"github.com/puppetlabs/relay-core/pkg/obj"
 	"github.com/puppetlabs/relay-core/pkg/util/retry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func TestTenantFinalizer(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
@@ -80,6 +87,10 @@ func TestTenantFinalizer(t *testing.T) {
 }
 
 func TestTenantAPITriggerEventSinkMissingSecret(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -133,6 +144,10 @@ func TestTenantAPITriggerEventSinkMissingSecret(t *testing.T) {
 }
 
 func TestTenantAPITriggerEventSinkWithSecret(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -176,6 +191,10 @@ func TestTenantAPITriggerEventSinkWithSecret(t *testing.T) {
 }
 
 func TestTenantAPITriggerEventSinkWithNamespaceAndSecret(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -226,6 +245,10 @@ func TestTenantAPITriggerEventSinkWithNamespaceAndSecret(t *testing.T) {
 }
 
 func TestTenantNamespaceUpdate(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -272,5 +295,70 @@ func TestTenantNamespaceUpdate(t *testing.T) {
 		} else {
 			require.NotEmpty(t, ns1.GetDeletionTimestamp())
 		}
+	})
+}
+
+func TestTenantToolInjection(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	WithConfig(t, ctx, []ConfigOption{
+		ConfigWithTenantReconciler,
+	}, func(cfg *Config) {
+		child := fmt.Sprintf("%s-child-1", cfg.Namespace.GetName())
+
+		size, _ := resource.ParseQuantity("100Mi")
+		storageClassName := "example-hostpath"
+		tenant := &relayv1beta1.Tenant{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: cfg.Namespace.GetName(),
+				Name:      "tenant-" + uuid.New().String(),
+			},
+			Spec: relayv1beta1.TenantSpec{
+				NamespaceTemplate: relayv1beta1.NamespaceTemplate{
+					Metadata: metav1.ObjectMeta{
+						Name: child,
+					},
+				},
+				ToolInjection: relayv1beta1.ToolInjection{
+					VolumeClaimTemplate: &corev1.PersistentVolumeClaim{
+						Spec: corev1.PersistentVolumeClaimSpec{
+							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							Resources: corev1.ResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{
+									corev1.ResourceStorage: size,
+								},
+							},
+							StorageClassName: &storageClassName,
+						},
+					},
+				},
+			},
+		}
+
+		CreateAndWaitForTenant(t, ctx, tenant)
+
+		var ns corev1.Namespace
+		require.Equal(t, child, tenant.Status.Namespace)
+		require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: child}, &ns))
+
+		var job batchv1.Job
+		require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tenant.GetName() + "-volume", Namespace: tenant.Status.Namespace}, &job))
+		e2e.ControllerRuntimeClient.Delete(ctx, &job)
+
+		var pvc corev1.PersistentVolumeClaim
+		require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tenant.GetName() + "-volume-rwo", Namespace: tenant.Status.Namespace}, &pvc))
+		e2e.ControllerRuntimeClient.Delete(ctx, &pvc)
+
+		require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tenant.GetName() + "-volume-rox", Namespace: tenant.Status.Namespace}, &pvc))
+		e2e.ControllerRuntimeClient.Delete(ctx, &pvc)
+
+		var pv corev1.PersistentVolume
+		require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tenant.GetName() + "-volume-rox"}, &pv))
+		e2e.ControllerRuntimeClient.Delete(ctx, &pv)
 	})
 }
