@@ -738,7 +738,7 @@ func TestWebhookTriggerKnativeRevisionsWithTenantVolumeClaim(t *testing.T) {
 			}))
 
 			var pv corev1.PersistentVolume
-			require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tn.GetName() + "-volume-rox"}, &pv))
+			require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tn.GetName() + model.EntrypointVolumeClaimSuffixReadOnlyMany}, &pv))
 
 			e2e.ControllerRuntimeClient.Delete(ctx, &pv)
 		})

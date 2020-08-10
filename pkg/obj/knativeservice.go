@@ -15,7 +15,6 @@ import (
 const (
 	AmbassadorIDAnnotation                      = "getambassador.io/ambassador-id"
 	ImmutableConfigMapResourceVersionAnnotation = "controller.relay.sh/immutable-config-map-resource-version"
-	VolumeClaimAnnotation                       = "controller.relay.sh/volume-claim"
 
 	KnativeServiceVisibilityLabel = "serving.knative.dev/visibility"
 )
@@ -184,7 +183,7 @@ func ConfigureKnativeService(ctx context.Context, s *KnativeService, wtd *Webhoo
 	}
 
 	if wtd.Tenant.Object.Spec.ToolInjection.VolumeClaimTemplate != nil {
-		Annotate(&template.ObjectMeta, VolumeClaimAnnotation, wtd.Tenant.Object.GetName()+"-volume-rox")
+		Annotate(&template.ObjectMeta, model.RelayControllerVolumeClaimAnnotation, wtd.Tenant.Object.GetName()+model.EntrypointVolumeClaimSuffixReadOnlyMany)
 	}
 
 	s.Object.Spec = servingv1.ServiceSpec{

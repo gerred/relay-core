@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/puppetlabs/relay-core/pkg/admission"
+	"github.com/puppetlabs/relay-core/pkg/model"
 	"github.com/puppetlabs/relay-core/pkg/util/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -129,7 +130,7 @@ func TestEntrypointHandler(t *testing.T) {
 					Namespace: child.GetName(),
 					Name:      "sneaky-pod",
 					Annotations: map[string]string{
-						admission.VolumeClaimAnnotation: "volume-claim",
+						model.RelayControllerVolumeClaimAnnotation: "volume-claim",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -140,8 +141,8 @@ func TestEntrypointHandler(t *testing.T) {
 							Command: []string{"sh", "-c", "trap : TERM INT; sleep 600 & wait"},
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									Name:      "entrypoint",
-									MountPath: "/data",
+									Name:      model.EntrypointVolumeMountName,
+									MountPath: model.EntrypointVolumeMountPath,
 									ReadOnly:  true,
 								},
 							},
@@ -153,7 +154,7 @@ func TestEntrypointHandler(t *testing.T) {
 
 			entrypoint := false
 			for _, volume := range pod.Spec.Volumes {
-				if volume.Name == "entrypoint" {
+				if volume.Name == model.EntrypointVolumeMountName {
 					entrypoint = true
 				}
 			}

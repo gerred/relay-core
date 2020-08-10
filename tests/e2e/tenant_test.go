@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	relayv1beta1 "github.com/puppetlabs/relay-core/pkg/apis/relay.sh/v1beta1"
+	"github.com/puppetlabs/relay-core/pkg/model"
 	"github.com/puppetlabs/relay-core/pkg/obj"
 	"github.com/puppetlabs/relay-core/pkg/util/retry"
 	"github.com/stretchr/testify/assert"
@@ -347,18 +348,18 @@ func TestTenantToolInjection(t *testing.T) {
 		require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: child}, &ns))
 
 		var job batchv1.Job
-		require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tenant.GetName() + "-volume", Namespace: tenant.Status.Namespace}, &job))
+		require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tenant.GetName() + model.EntrypointVolumeClaimSuffixReadOnlyMany, Namespace: tenant.Status.Namespace}, &job))
 		e2e.ControllerRuntimeClient.Delete(ctx, &job)
 
 		var pvc corev1.PersistentVolumeClaim
-		require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tenant.GetName() + "-volume-rwo", Namespace: tenant.Status.Namespace}, &pvc))
+		require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tenant.GetName() + model.EntrypointVolumeClaimSuffixReadWriteOnce, Namespace: tenant.Status.Namespace}, &pvc))
 		e2e.ControllerRuntimeClient.Delete(ctx, &pvc)
 
-		require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tenant.GetName() + "-volume-rox", Namespace: tenant.Status.Namespace}, &pvc))
+		require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tenant.GetName() + model.EntrypointVolumeClaimSuffixReadOnlyMany, Namespace: tenant.Status.Namespace}, &pvc))
 		e2e.ControllerRuntimeClient.Delete(ctx, &pvc)
 
 		var pv corev1.PersistentVolume
-		require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tenant.GetName() + "-volume-rox"}, &pv))
+		require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tenant.GetName() + model.EntrypointVolumeClaimSuffixReadOnlyMany}, &pv))
 		e2e.ControllerRuntimeClient.Delete(ctx, &pv)
 	})
 }

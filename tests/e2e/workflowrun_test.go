@@ -146,16 +146,16 @@ func TestWorkflowRunWithTenantVolumeClaim(t *testing.T) {
 			require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tenant.Status.Namespace}, &ns))
 
 			var job batchv1.Job
-			require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tenant.GetName() + "-volume", Namespace: tenant.Status.Namespace}, &job))
+			require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tenant.GetName() + model.EntrypointVolumeClaimSuffixReadOnlyMany, Namespace: tenant.Status.Namespace}, &job))
 
 			var pvcw corev1.PersistentVolumeClaim
-			require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tenant.GetName() + "-volume-rwo", Namespace: tenant.Status.Namespace}, &pvcw))
+			require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tenant.GetName() + model.EntrypointVolumeClaimSuffixReadWriteOnce, Namespace: tenant.Status.Namespace}, &pvcw))
 
 			var pvcr corev1.PersistentVolumeClaim
-			require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tenant.GetName() + "-volume-rox", Namespace: tenant.Status.Namespace}, &pvcr))
+			require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tenant.GetName() + model.EntrypointVolumeClaimSuffixReadOnlyMany, Namespace: tenant.Status.Namespace}, &pvcr))
 
 			var pv corev1.PersistentVolume
-			require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tenant.GetName() + "-volume-rox"}, &pv))
+			require.NoError(t, e2e.ControllerRuntimeClient.Get(ctx, client.ObjectKey{Name: tenant.GetName() + model.EntrypointVolumeClaimSuffixReadOnlyMany}, &pv))
 
 			// Set a secret and connection for this workflow to look up.
 			cfg.Vault.SetSecret(t, tenant.GetName(), "foo", "Hello")

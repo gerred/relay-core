@@ -2,6 +2,7 @@ package obj
 
 import (
 	"context"
+	"path"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1"
@@ -84,7 +85,7 @@ func ConfigureTask(ctx context.Context, t *Task, wrd *WorkflowRunDeps, ws *nebul
 				Name:            "step",
 				Image:           image,
 				ImagePullPolicy: corev1.PullAlways,
-				Command:         []string{"/data/entrypoint"},
+				Command:         []string{path.Join(model.EntrypointVolumeMountPath, model.EntrypointCommand)},
 				Args:            argsForEntrypoint,
 				Env: []corev1.EnvVar{
 					{
@@ -100,8 +101,8 @@ func ConfigureTask(ctx context.Context, t *Task, wrd *WorkflowRunDeps, ws *nebul
 				},
 				VolumeMounts: []corev1.VolumeMount{
 					{
-						Name:      "entrypoint",
-						MountPath: "/data",
+						Name:      model.EntrypointVolumeMountName,
+						MountPath: model.EntrypointVolumeMountPath,
 						ReadOnly:  true,
 					},
 				},
@@ -114,8 +115,8 @@ func ConfigureTask(ctx context.Context, t *Task, wrd *WorkflowRunDeps, ws *nebul
 
 		t.Object.Spec.Steps = []tektonv1beta1.Step{step}
 
-		claim := wrd.WorkflowRun.Object.Spec.TenantRef.Name + "-volume-rox"
-		Annotate(&t.Object.ObjectMeta, VolumeClaimAnnotation, claim)
+		claim := wrd.WorkflowRun.Object.Spec.TenantRef.Name + model.EntrypointVolumeClaimSuffixReadOnlyMany
+		Annotate(&t.Object.ObjectMeta, model.RelayControllerVolumeClaimAnnotation, claim)
 	} else {
 
 		step := tektonv1beta1.Step{

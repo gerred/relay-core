@@ -2,6 +2,12 @@ package model
 
 const (
 	DefaultImage = "alpine:latest"
+
+	EntrypointCommand                        = "entrypoint"
+	EntrypointVolumeMountName                = "entrypoint"
+	EntrypointVolumeMountPath                = "/data"
+	EntrypointVolumeClaimSuffixReadWriteOnce = "-volume-rwo"
+	EntrypointVolumeClaimSuffixReadOnlyMany  = "-volume-rox"
 )
 
 const (
@@ -13,6 +19,7 @@ const (
 
 	RelayControllerTokenHashAnnotation    = "controller.relay.sh/token-hash"
 	RelayControllerDependencyOfAnnotation = "controller.relay.sh/dependency-of"
+	RelayControllerVolumeClaimAnnotation  = "controller.relay.sh/volume-claim"
 
 	RelayControllerTenantNameLabel       = "controller.relay.sh/tenant-name"
 	RelayControllerTenantWorkloadLabel   = "controller.relay.sh/tenant-workload"

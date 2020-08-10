@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/puppetlabs/relay-core/pkg/model"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-// TODO Where does this belong?
 const (
-	VolumeClaimAnnotation = "controller.relay.sh/volume-claim"
+	EntrypointAdmissionResponseAlreadyModified = "Entrypoint admission: already modified"
+	EntrypointAdmissionResponseNotRequired     = "Entrypoint admission: not required"
 )
 
 type EntrypointHandler struct {
@@ -27,19 +28,19 @@ func (eh *EntrypointHandler) Handle(ctx context.Context, req admission.Request) 
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	if claim, ok := pod.ObjectMeta.GetAnnotations()[VolumeClaimAnnotation]; ok {
+	if claim, ok := pod.ObjectMeta.GetAnnotations()[model.RelayControllerVolumeClaimAnnotation]; ok {
 		if pod.Spec.Volumes == nil {
 			pod.Spec.Volumes = make([]corev1.Volume, 0)
 		}
 
 		for _, volume := range pod.Spec.Volumes {
-			if volume.Name == "entrypoint" {
-				return admission.Allowed("Already modified")
+			if volume.Name == model.EntrypointVolumeMountName {
+				return admission.Allowed(EntrypointAdmissionResponseAlreadyModified)
 			}
 		}
 
 		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
-			Name: "entrypoint",
+			Name: model.EntrypointVolumeMountName,
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 					ClaimName: claim,
@@ -56,7 +57,7 @@ func (eh *EntrypointHandler) Handle(ctx context.Context, req admission.Request) 
 		return admission.PatchResponseFromRaw(req.Object.Raw, b)
 	}
 
-	return admission.Allowed("Unnecessary")
+	return admission.Allowed(EntrypointAdmissionResponseNotRequired)
 }
 
 func (eh *EntrypointHandler) InjectDecoder(d *admission.Decoder) error {

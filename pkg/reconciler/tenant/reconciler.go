@@ -6,6 +6,7 @@ import (
 
 	"github.com/puppetlabs/relay-core/pkg/config"
 	"github.com/puppetlabs/relay-core/pkg/errmark"
+	"github.com/puppetlabs/relay-core/pkg/model"
 	"github.com/puppetlabs/relay-core/pkg/obj"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -78,7 +79,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (result ctrl.Result, err error)
 		return ctrl.Result{}, nil
 	}
 
-	key := client.ObjectKey{Name: deps.Tenant.Object.GetName() + "-volume-rwo", Namespace: deps.Tenant.Object.Spec.NamespaceTemplate.Metadata.GetName()}
+	key := client.ObjectKey{Name: deps.Tenant.Object.GetName() + model.EntrypointVolumeClaimSuffixReadWriteOnce, Namespace: deps.Tenant.Object.Spec.NamespaceTemplate.Metadata.GetName()}
 	pvc, err := obj.ApplyPersistentVolumeClaim(ctx, r.Client, key, tn.Object.Spec.ToolInjection.VolumeClaimTemplate)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -100,7 +101,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (result ctrl.Result, err error)
 
 	pvn := &corev1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: tn.Object.GetName() + "-volume-rox",
+			Name: tn.Object.GetName() + model.EntrypointVolumeClaimSuffixReadOnlyMany,
 		},
 		Spec: corev1.PersistentVolumeSpec{
 			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadOnlyMany},
@@ -121,7 +122,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (result ctrl.Result, err error)
 		}
 	}
 
-	key = client.ObjectKey{Name: tn.Object.GetName() + "-volume-rox"}
+	key = client.ObjectKey{Name: tn.Object.GetName() + model.EntrypointVolumeClaimSuffixReadOnlyMany}
 	_, err = obj.ApplyPersistentVolume(ctx, r.Client, key, pvn)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -139,7 +140,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (result ctrl.Result, err error)
 		},
 	}
 
-	key = client.ObjectKey{Name: tn.Object.GetName() + "-volume-rox", Namespace: tn.Object.Spec.NamespaceTemplate.Metadata.GetName()}
+	key = client.ObjectKey{Name: tn.Object.GetName() + model.EntrypointVolumeClaimSuffixReadOnlyMany, Namespace: tn.Object.Spec.NamespaceTemplate.Metadata.GetName()}
 	_, err = obj.ApplyPersistentVolumeClaim(ctx, r.Client, key, pvcn)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -154,14 +155,14 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (result ctrl.Result, err error)
 	}
 
 	container := corev1.Container{
-		Name:    "entrypoint",
+		Name:    model.EntrypointVolumeMountName,
 		Image:   "gcr.io/nebula-tasks/relay-entrypoint:latest",
 		Command: []string{"cp"},
-		Args:    []string{"-r", "/var/lib/puppet/relay/.", "/data"},
+		Args:    []string{"-r", "/var/lib/puppet/relay/.", model.EntrypointVolumeMountPath},
 		VolumeMounts: []corev1.VolumeMount{
 			{
-				Name:      "entrypoint",
-				MountPath: "/data",
+				Name:      model.EntrypointVolumeMountName,
+				MountPath: model.EntrypointVolumeMountPath,
 			},
 		},
 	}
@@ -170,13 +171,13 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (result ctrl.Result, err error)
 
 	j := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      tn.Object.GetName() + "-volume",
+			Name:      tn.Object.GetName() + model.EntrypointVolumeClaimSuffixReadOnlyMany,
 			Namespace: tn.Object.Spec.NamespaceTemplate.Metadata.GetName(),
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "entrypoint",
+					Name:      model.EntrypointVolumeMountName,
 					Namespace: tn.Object.Spec.NamespaceTemplate.Metadata.GetName(),
 				},
 				Spec: corev1.PodSpec{
@@ -184,7 +185,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (result ctrl.Result, err error)
 					RestartPolicy: corev1.RestartPolicyNever,
 					Volumes: []corev1.Volume{
 						{
-							Name: "entrypoint",
+							Name: model.EntrypointVolumeMountName,
 							VolumeSource: corev1.VolumeSource{
 								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 									ClaimName: pvc.Object.GetName(),
@@ -200,7 +201,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (result ctrl.Result, err error)
 		},
 	}
 
-	key = client.ObjectKey{Name: tn.Object.GetName() + "-volume", Namespace: tn.Object.Spec.NamespaceTemplate.Metadata.GetName()}
+	key = client.ObjectKey{Name: tn.Object.GetName() + model.EntrypointVolumeClaimSuffixReadOnlyMany, Namespace: tn.Object.Spec.NamespaceTemplate.Metadata.GetName()}
 	job, err := obj.ApplyJob(ctx, r.Client, key, j)
 	if err != nil && !k8serrors.IsAlreadyExists(err) {
 		return ctrl.Result{}, err
