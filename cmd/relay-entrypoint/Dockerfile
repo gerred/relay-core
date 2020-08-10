@@ -3,10 +3,14 @@ ENV GO111MODULE on
 ENV CGO_ENABLED 0
 WORKDIR /build
 COPY . .
-RUN go build -a -installsuffix cgo -o /usr/bin/entrypoint ./cmd/relay-entrypoint
+RUN go build -a -installsuffix cgo -o /var/lib/puppet/relay/entrypoint ./cmd/relay-entrypoint
 
-FROM relaysh/core
+FROM relaysh/core AS source
 
-COPY --from=builder /usr/bin/entrypoint /usr/bin/entrypoint
-RUN apk --no-cache add ca-certificates && update-ca-certificates
-ENTRYPOINT ["ni"]
+FROM gcr.io/distroless/base:debug-nonroot
+
+COPY --from=builder /var/lib/puppet/relay/entrypoint /var/lib/puppet/relay/entrypoint
+COPY --from=source /usr/local/bin/ni /var/lib/puppet/relay/ni
+COPY --from=source /usr/local/bin/relay /var/lib/puppet/relay/relay
+
+ENTRYPOINT ["/var/lib/puppet/relay/entrypoint"]

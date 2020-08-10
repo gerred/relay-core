@@ -155,9 +155,9 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (result ctrl.Result, err error)
 
 	container := corev1.Container{
 		Name:    "entrypoint",
-		Image:   "gcr.io/nebula-tasks/relay-entrypoint",
+		Image:   "gcr.io/nebula-tasks/relay-entrypoint:latest",
 		Command: []string{"cp"},
-		Args:    []string{"/usr/bin/entrypoint", "/data/entrypoint"},
+		Args:    []string{"-r", "/var/lib/puppet/relay/.", "/data"},
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      "entrypoint",

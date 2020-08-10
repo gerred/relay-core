@@ -311,7 +311,7 @@ func TestTenantToolInjection(t *testing.T) {
 	}, func(cfg *Config) {
 		child := fmt.Sprintf("%s-child-1", cfg.Namespace.GetName())
 
-		size, _ := resource.ParseQuantity("100Mi")
+		size, _ := resource.ParseQuantity("50Mi")
 		storageClassName := "example-hostpath"
 		tenant := &relayv1beta1.Tenant{
 			ObjectMeta: metav1.ObjectMeta{

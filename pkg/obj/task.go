@@ -47,6 +47,8 @@ func ConfigureTask(ctx context.Context, t *Task, wrd *WorkflowRunDeps, ws *nebul
 		image = model.DefaultImage
 	}
 
+	// TODO Reference the tool injection from the tenant (once this is available)
+	// For now, the only reason we'll add a tenant reference is to enable entrypoint handling
 	if wrd.WorkflowRun.Object.Spec.TenantRef != nil {
 		ref, err := name.ParseReference(ws.Image, name.WeakValidation)
 		if err != nil {
@@ -113,17 +115,7 @@ func ConfigureTask(ctx context.Context, t *Task, wrd *WorkflowRunDeps, ws *nebul
 		t.Object.Spec.Steps = []tektonv1beta1.Step{step}
 
 		claim := wrd.WorkflowRun.Object.Spec.TenantRef.Name + "-volume-rox"
-		t.Object.Spec.Volumes = []corev1.Volume{
-			{
-				Name: "entrypoint",
-				VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: claim,
-						ReadOnly:  true,
-					},
-				},
-			},
-		}
+		Annotate(&t.Object.ObjectMeta, VolumeClaimAnnotation, claim)
 	} else {
 
 		step := tektonv1beta1.Step{

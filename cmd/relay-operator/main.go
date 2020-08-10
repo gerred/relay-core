@@ -184,6 +184,10 @@ func main() {
 		),
 	})
 
+	dm.Manager.GetWebhookServer().Register("/mutate/entrypoint", &webhook.Admission{
+		Handler: admission.NewEntrypointHandler(),
+	})
+
 	if err := dm.Manager.Start(signals.SetupSignalHandler()); err != nil {
 		log.Fatal("Manager exited non-zero", err)
 	}
