@@ -92,6 +92,10 @@ func NewAuthenticator(sc *opt.SampleConfig, key interface{}) *Authenticator {
 
 			conditionManager := memory.NewConditionManager(conditionOpts...)
 
+			var envOpts []memory.EnvironmentManagerOption
+
+			environmentManager := memory.NewEnvironmentManager(envOpts...)
+
 			var specOpts []memory.SpecManagerOption
 			if sc.Spec != nil {
 				specOpts = append(specOpts, memory.SpecManagerWithInitialSpec(sc.Spec.Interface()))
@@ -114,6 +118,7 @@ func NewAuthenticator(sc *opt.SampleConfig, key interface{}) *Authenticator {
 
 			a.mgrs[step.Hash()] = func(mgrs *builder.MetadataBuilder) {
 				mgrs.SetConditions(conditionManager)
+				mgrs.SetEnvironment(environmentManager)
 				mgrs.SetParameters(parameterManager)
 				mgrs.SetSpec(specManager)
 				mgrs.SetState(stateManager)

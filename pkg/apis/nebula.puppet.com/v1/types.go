@@ -61,6 +61,9 @@ type WorkflowStep struct {
 	Args []string `json:"args,omitempty"`
 
 	// +optional
+	Env relayv1beta1.UnstructuredObject `json:"env,omitempty"`
+
+	// +optional
 	When relayv1beta1.Unstructured `json:"when,omitempty"`
 
 	// +optional

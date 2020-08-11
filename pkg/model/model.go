@@ -37,6 +37,7 @@ type MetadataManagers interface {
 	Conditions() ConditionGetterManager
 	Connections() ConnectionManager
 	Events() EventManager
+	Environment() EnvironmentGetterManager
 	Parameters() ParameterGetterManager
 	Secrets() SecretManager
 	Spec() SpecGetterManager
@@ -49,6 +50,7 @@ type MetadataManagers interface {
 type RunReconcilerManagers interface {
 	Conditions() ConditionSetterManager
 	Parameters() ParameterSetterManager
+	Environment() EnvironmentSetterManager
 	Spec() SpecSetterManager
 	State() StateSetterManager
 }
@@ -56,5 +58,6 @@ type RunReconcilerManagers interface {
 // WebhookTriggerReconcilerManagers are the managers used by the workflow
 // trigger reconciler when configuring a Knative service for the trigger.
 type WebhookTriggerReconcilerManagers interface {
+	Environment() EnvironmentSetterManager
 	Spec() SpecSetterManager
 }
