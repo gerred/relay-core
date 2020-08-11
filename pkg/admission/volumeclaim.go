@@ -10,14 +10,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-type EntrypointHandler struct {
+type VolumeClaimHandler struct {
 	decoder *admission.Decoder
 }
 
-var _ admission.Handler = &EntrypointHandler{}
-var _ admission.DecoderInjector = &EntrypointHandler{}
+var _ admission.Handler = &VolumeClaimHandler{}
+var _ admission.DecoderInjector = &VolumeClaimHandler{}
 
-func (eh *EntrypointHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
+func (eh *VolumeClaimHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
 	pod := &corev1.Pod{}
 	if err := eh.decoder.Decode(req, pod); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
@@ -92,15 +92,15 @@ func (eh *EntrypointHandler) Handle(ctx context.Context, req admission.Request) 
 	return admission.Allowed("")
 }
 
-func (eh *EntrypointHandler) InjectDecoder(d *admission.Decoder) error {
+func (eh *VolumeClaimHandler) InjectDecoder(d *admission.Decoder) error {
 	eh.decoder = d
 	return nil
 }
 
-type EntrypointHandlerOption func(eh *EntrypointHandler)
+type VolumeClaimHandlerOption func(eh *VolumeClaimHandler)
 
-func NewEntrypointHandler(opts ...EntrypointHandlerOption) *EntrypointHandler {
-	eh := &EntrypointHandler{}
+func NewVolumeClaimHandler(opts ...VolumeClaimHandlerOption) *VolumeClaimHandler {
+	eh := &VolumeClaimHandler{}
 
 	for _, opt := range opts {
 		opt(eh)

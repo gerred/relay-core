@@ -6,6 +6,8 @@ const (
 	EntrypointCommand                        = "entrypoint"
 	EntrypointCommandFlag                    = "-entrypoint"
 	EntrypointCommandArgSeparator            = "--"
+	EntrypointImage                          = "gcr.io/nebula-tasks/relay-entrypoint"
+	EntrypointImagePath                      = "/var/lib/puppet/relay/."
 	EntrypointVolumeMountName                = "entrypoint"
 	EntrypointVolumeMountPath                = "/data"
 	EntrypointVolumeClaimSuffixReadOnlyMany  = "-volume-rox"

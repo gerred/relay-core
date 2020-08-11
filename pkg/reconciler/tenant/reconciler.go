@@ -79,19 +79,31 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (result ctrl.Result, err error)
 		return ctrl.Result{}, nil
 	}
 
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      deps.Tenant.Object.GetName() + model.EntrypointVolumeClaimSuffixReadWriteOnce,
+			Namespace: tn.Object.Spec.NamespaceTemplate.Metadata.GetName(),
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			Resources:        tn.Object.Spec.ToolInjection.VolumeClaimTemplate.Spec.Resources,
+			StorageClassName: tn.Object.Spec.ToolInjection.VolumeClaimTemplate.Spec.StorageClassName,
+		},
+	}
+
 	key := client.ObjectKey{Name: deps.Tenant.Object.GetName() + model.EntrypointVolumeClaimSuffixReadWriteOnce, Namespace: deps.Tenant.Object.Spec.NamespaceTemplate.Metadata.GetName()}
-	pvc, err := obj.ApplyPersistentVolumeClaim(ctx, r.Client, key, tn.Object.Spec.ToolInjection.VolumeClaimTemplate)
+	pvco, err := obj.ApplyPersistentVolumeClaim(ctx, r.Client, key, pvc)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if pvc.Object.Spec.VolumeName == "" || pvc.Object.Status.Phase != corev1.ClaimBound {
+	if pvco.Object.Spec.VolumeName == "" || pvco.Object.Status.Phase != corev1.ClaimBound {
 		return ctrl.Result{Requeue: true}, nil
 	}
 
 	pv := &corev1.PersistentVolume{}
 
-	if err := r.Client.Get(ctx, client.ObjectKey{Name: pvc.Object.Spec.VolumeName}, pv); k8serrors.IsNotFound(err) {
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: pvco.Object.Spec.VolumeName}, pv); k8serrors.IsNotFound(err) {
 		return ctrl.Result{}, err
 	}
 
@@ -135,8 +147,8 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (result ctrl.Result, err error)
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadOnlyMany},
-			Resources:        pvc.Object.Spec.Resources,
-			StorageClassName: pvc.Object.Spec.StorageClassName,
+			Resources:        pvco.Object.Spec.Resources,
+			StorageClassName: pvco.Object.Spec.StorageClassName,
 		},
 	}
 
@@ -154,11 +166,12 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (result ctrl.Result, err error)
 		return ctrl.Result{Requeue: true}, nil
 	}
 
+	// FIXME Entrypoint image, path, mount name, and mount path must be configurable
 	container := corev1.Container{
 		Name:    model.EntrypointVolumeMountName,
-		Image:   "gcr.io/nebula-tasks/relay-entrypoint:latest",
+		Image:   model.EntrypointImage,
 		Command: []string{"cp"},
-		Args:    []string{"-r", "/var/lib/puppet/relay/.", model.EntrypointVolumeMountPath},
+		Args:    []string{"-r", model.EntrypointImagePath, model.EntrypointVolumeMountPath},
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      model.EntrypointVolumeMountName,
@@ -188,7 +201,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (result ctrl.Result, err error)
 							Name: model.EntrypointVolumeMountName,
 							VolumeSource: corev1.VolumeSource{
 								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: pvc.Object.GetName(),
+									ClaimName: pvco.Object.GetName(),
 								},
 							},
 						},

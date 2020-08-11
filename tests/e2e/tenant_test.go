@@ -328,7 +328,6 @@ func TestTenantToolInjection(t *testing.T) {
 				ToolInjection: relayv1beta1.ToolInjection{
 					VolumeClaimTemplate: &corev1.PersistentVolumeClaim{
 						Spec: corev1.PersistentVolumeClaimSpec{
-							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 							Resources: corev1.ResourceRequirements{
 								Requests: map[corev1.ResourceName]resource.Quantity{
 									corev1.ResourceStorage: size,

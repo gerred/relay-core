@@ -55,7 +55,7 @@ func (e *EndToEndEnvironment) WithTestNamespace(t *testing.T, ctx context.Contex
 			GenerateName: fmt.Sprintf("relay-e2e-%s-", namePrefix),
 			Labels: map[string]string{
 				"testing.relay.sh/harness":    "end-to-end",
-				"testing.relay.sh/entrypoint": "true",
+				"testing.relay.sh/volume-claim": "true",
 			},
 		},
 	}

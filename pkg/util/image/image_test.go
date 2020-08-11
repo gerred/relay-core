@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/puppetlabs/relay-core/pkg/model"
 	"github.com/puppetlabs/relay-core/pkg/util/image"
 	"github.com/stretchr/testify/require"
 )
 
+// TODO Consider replacing with proper unit testing instead of integration testing
+// Not all of these examples would be functional if used in a live environment (i.e. `hashicorp/http-echo` does not have `echo`)
 func TestImageEntrypoint(t *testing.T) {
 	tcs := []struct {
 		Name     string
@@ -17,32 +20,88 @@ func TestImageEntrypoint(t *testing.T) {
 		Expected []string
 	}{
 		{
-			Name:     "Image with defined ENTRYPOINT & COMMAND",
-			Image:    "gcr.io/nebula-tasks/entrypoint",
+			Name:     "entrypoint:false;command:true;command_override:false;args:false",
+			Image:    "busybox",
 			Command:  nil,
 			Args:     nil,
-			Expected: []string{"-entrypoint", "ni", "--", "log", "info", "hello world"},
+			Expected: []string{model.EntrypointCommandFlag, "sh", model.EntrypointCommandArgSeparator},
 		},
 		{
-			Name:     "Image with defined ENTRYPOINT & COMMAND and additional arguments",
-			Image:    "gcr.io/nebula-tasks/entrypoint",
-			Command:  nil,
-			Args:     []string{"yes", "no"},
-			Expected: []string{"-entrypoint", "ni", "--", "log", "info", "hello world", "yes", "no"},
-		},
-		{
-			Name:     "Image with defined ENTRYPOINT & COMMAND and overridden command",
-			Image:    "gcr.io/nebula-tasks/entrypoint",
-			Command:  []string{"execute", "this"},
+			Name:     "entrypoint:false;command:true;command_override:true;args:false",
+			Image:    "busybox",
+			Command:  []string{"echo", "hello"},
 			Args:     nil,
-			Expected: []string{"-entrypoint", "execute", "--", "this"},
+			Expected: []string{model.EntrypointCommandFlag, "echo", model.EntrypointCommandArgSeparator, "hello"},
 		},
 		{
-			Name:     "Image with defined ENTRYPOINT & COMMAND, overridden command, and additional arguments",
-			Image:    "gcr.io/nebula-tasks/entrypoint",
-			Command:  []string{"execute", "this"},
-			Args:     []string{"yes", "no"},
-			Expected: []string{"-entrypoint", "execute", "--", "this", "yes", "no"},
+			Name:     "entrypoint:false;command:true;command_override:true;args:true",
+			Image:    "busybox",
+			Command:  nil,
+			Args:     []string{"echo", "hello"},
+			Expected: []string{model.EntrypointCommandFlag, "sh", model.EntrypointCommandArgSeparator, "echo", "hello"},
+		},
+		{
+			Name:     "entrypoint:false;command:true;command_override:true;args:true",
+			Image:    "busybox",
+			Command:  []string{"echo"},
+			Args:     []string{"hello"},
+			Expected: []string{model.EntrypointCommandFlag, "echo", model.EntrypointCommandArgSeparator, "hello"},
+		},
+		{
+			Name:     "entrypoint:true;command:true;command_override:false;args:false",
+			Image:    "nginx",
+			Command:  nil,
+			Args:     nil,
+			Expected: []string{model.EntrypointCommandFlag, "/docker-entrypoint.sh", model.EntrypointCommandArgSeparator, "nginx", "-g", "daemon off;"},
+		},
+		{
+			Name:     "entrypoint:true;command:true;command_override:true;args:false",
+			Image:    "nginx",
+			Command:  []string{"echo", "hello"},
+			Args:     nil,
+			Expected: []string{model.EntrypointCommandFlag, "echo", model.EntrypointCommandArgSeparator, "hello"},
+		},
+		{
+			Name:     "entrypoint:true;command:true;command_override:true;args:true",
+			Image:    "nginx",
+			Command:  nil,
+			Args:     []string{"echo", "hello"},
+			Expected: []string{model.EntrypointCommandFlag, "/docker-entrypoint.sh", model.EntrypointCommandArgSeparator, "echo", "hello"},
+		},
+		{
+			Name:     "entrypoint:true;command:true;command_override:true;args:true",
+			Image:    "nginx",
+			Command:  []string{"echo"},
+			Args:     []string{"hello"},
+			Expected: []string{model.EntrypointCommandFlag, "echo", model.EntrypointCommandArgSeparator, "hello"},
+		},
+		{
+			Name:     "entrypoint:true;command:false;command_override:false;args:false",
+			Image:    "hashicorp/http-echo",
+			Command:  nil,
+			Args:     nil,
+			Expected: []string{model.EntrypointCommandFlag, "/http-echo", model.EntrypointCommandArgSeparator},
+		},
+		{
+			Name:     "entrypoint:true;command:false;command_override:true;args:false",
+			Image:    "hashicorp/http-echo",
+			Command:  []string{"echo", "hello"},
+			Args:     nil,
+			Expected: []string{model.EntrypointCommandFlag, "echo", model.EntrypointCommandArgSeparator, "hello"},
+		},
+		{
+			Name:     "entrypoint:true;command:false;command_override:true;args:true",
+			Image:    "hashicorp/http-echo",
+			Command:  nil,
+			Args:     []string{"-text", "hello"},
+			Expected: []string{model.EntrypointCommandFlag, "/http-echo", model.EntrypointCommandArgSeparator, "-text", "hello"},
+		},
+		{
+			Name:     "entrypoint:true;command:false;command_override:true;args:true",
+			Image:    "hashicorp/http-echo",
+			Command:  []string{"echo"},
+			Args:     []string{"hello"},
+			Expected: []string{model.EntrypointCommandFlag, "echo", model.EntrypointCommandArgSeparator, "hello"},
 		},
 	}
 

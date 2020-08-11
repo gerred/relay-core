@@ -184,8 +184,8 @@ func main() {
 		),
 	})
 
-	dm.Manager.GetWebhookServer().Register("/mutate/entrypoint", &webhook.Admission{
-		Handler: admission.NewEntrypointHandler(),
+	dm.Manager.GetWebhookServer().Register("/mutate/volume-claim", &webhook.Admission{
+		Handler: admission.NewVolumeClaimHandler(),
 	})
 
 	if err := dm.Manager.Start(signals.SetupSignalHandler()); err != nil {

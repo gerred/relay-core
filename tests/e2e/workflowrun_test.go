@@ -42,7 +42,7 @@ func TestWorkflowRunWithTenantVolumeClaim(t *testing.T) {
 		ConfigWithTenantReconciler,
 		ConfigWithWorkflowRunReconciler,
 	}, func(cfg *Config) {
-		hnd := testServerInjectorHandler{&webhook.Admission{Handler: admission.NewEntrypointHandler()}}
+		hnd := testServerInjectorHandler{&webhook.Admission{Handler: admission.NewVolumeClaimHandler()}}
 		cfg.Manager.SetFields(hnd)
 
 		s := httptest.NewServer(hnd)
@@ -57,11 +57,11 @@ func TestWorkflowRunWithTenantVolumeClaim(t *testing.T) {
 					Kind:       "MutatingWebhookConfiguration",
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "entrypoint",
+					Name: "volume-claim",
 				},
 				Webhooks: []admissionregistrationv1beta1.MutatingWebhook{
 					{
-						Name: "entrypoint.admission.controller.relay.sh",
+						Name: "volume-claim.admission.controller.relay.sh",
 						ClientConfig: admissionregistrationv1beta1.WebhookClientConfig{
 							Service: &admissionregistrationv1beta1.ServiceReference{
 								Namespace: svc.GetNamespace(),
@@ -93,7 +93,7 @@ func TestWorkflowRunWithTenantVolumeClaim(t *testing.T) {
 						}(admissionregistrationv1beta1.IfNeededReinvocationPolicy),
 						NamespaceSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								"testing.relay.sh/entrypoint": "true",
+								"testing.relay.sh/volume-claim": "true",
 							},
 						},
 					},
@@ -126,7 +126,6 @@ func TestWorkflowRunWithTenantVolumeClaim(t *testing.T) {
 					ToolInjection: relayv1beta1.ToolInjection{
 						VolumeClaimTemplate: &corev1.PersistentVolumeClaim{
 							Spec: corev1.PersistentVolumeClaimSpec{
-								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 								Resources: corev1.ResourceRequirements{
 									Requests: map[corev1.ResourceName]resource.Quantity{
 										corev1.ResourceStorage: size,

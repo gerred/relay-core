@@ -20,7 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
-func TestEntrypointHandler(t *testing.T) {
+func TestVolumeClaimHandler(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -45,7 +45,7 @@ func TestEntrypointHandler(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	hnd := testServerInjectorHandler{&webhook.Admission{Handler: admission.NewEntrypointHandler()}}
+	hnd := testServerInjectorHandler{&webhook.Admission{Handler: admission.NewVolumeClaimHandler()}}
 	mgr.SetFields(hnd)
 
 	s := httptest.NewServer(hnd)
@@ -59,11 +59,11 @@ func TestEntrypointHandler(t *testing.T) {
 					Kind:       "MutatingWebhookConfiguration",
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "entrypoint",
+					Name: "volume-claim",
 				},
 				Webhooks: []admissionregistrationv1beta1.MutatingWebhook{
 					{
-						Name: "entrypoint.admission.controller.relay.sh",
+						Name: "volume-claim.admission.controller.relay.sh",
 						ClientConfig: admissionregistrationv1beta1.WebhookClientConfig{
 							Service: &admissionregistrationv1beta1.ServiceReference{
 								Namespace: svc.GetNamespace(),
@@ -95,7 +95,7 @@ func TestEntrypointHandler(t *testing.T) {
 						}(admissionregistrationv1beta1.IfNeededReinvocationPolicy),
 						NamespaceSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								"testing.relay.sh/entrypoint": "true",
+								"testing.relay.sh/volume-claim": "true",
 							},
 						},
 					},
@@ -113,7 +113,7 @@ func TestEntrypointHandler(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("%s-child", ns.GetName()),
 					Labels: map[string]string{
-						"testing.relay.sh/entrypoint": "true",
+						"testing.relay.sh/volume-claim": "true",
 					},
 				},
 			}
