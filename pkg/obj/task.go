@@ -4,11 +4,9 @@ import (
 	"context"
 	"path"
 
-	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/google/go-containerregistry/pkg/v1"
-	"github.com/google/go-containerregistry/pkg/v1/remote"
 	nebulav1 "github.com/puppetlabs/relay-core/pkg/apis/nebula.puppet.com/v1"
 	"github.com/puppetlabs/relay-core/pkg/model"
+	"github.com/puppetlabs/relay-core/pkg/util/image"
 	tektonv1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -43,50 +41,26 @@ func NewTask(key client.ObjectKey) *Task {
 }
 
 func ConfigureTask(ctx context.Context, t *Task, wrd *WorkflowRunDeps, ws *nebulav1.WorkflowStep) error {
-	image := ws.Image
-	if image == "" {
-		image = model.DefaultImage
+	i := ws.Image
+	if i == "" {
+		i = model.DefaultImage
 	}
 
 	// TODO Reference the tool injection from the tenant (once this is available)
 	// For now, the only reason we'll add a tenant reference is to enable entrypoint handling
 	if wrd.WorkflowRun.Object.Spec.TenantRef != nil {
-		ref, err := name.ParseReference(ws.Image, name.WeakValidation)
+		ep, err := image.ImageEntrypoint(i, []string{ws.Command}, ws.Args)
 		if err != nil {
 			return err
-		}
-
-		img, err := remote.Image(ref)
-		if err != nil {
-			return err
-		}
-
-		ep, cmd, _, err := imageData(ref, img)
-		if err != nil {
-			return err
-		}
-
-		var args []string
-		var argsForEntrypoint []string
-
-		if len(ep) > 0 {
-			argsForEntrypoint = append(argsForEntrypoint, "-entrypoint", ep[0], "--")
-			args = append(ep[1:], args...)
-			args = append(cmd[0:], args...)
-			argsForEntrypoint = append(argsForEntrypoint, args...)
-		} else {
-			argsForEntrypoint = append(argsForEntrypoint, "-entrypoint", cmd[0], "--")
-			args = append(cmd[1:], args...)
-			argsForEntrypoint = append(argsForEntrypoint, args...)
 		}
 
 		step := tektonv1beta1.Step{
 			Container: corev1.Container{
 				Name:            "step",
-				Image:           image,
+				Image:           i,
 				ImagePullPolicy: corev1.PullAlways,
 				Command:         []string{path.Join(model.EntrypointVolumeMountPath, model.EntrypointCommand)},
-				Args:            argsForEntrypoint,
+				Args:            ep,
 				Env: []corev1.EnvVar{
 					{
 						Name:  "METADATA_API_URL",
@@ -98,13 +72,6 @@ func ConfigureTask(ctx context.Context, t *Task, wrd *WorkflowRunDeps, ws *nebul
 					// access to the container filesystem. Eventually, we'll use gVisor
 					// to protect us here.
 					AllowPrivilegeEscalation: func(b bool) *bool { return &b }(false),
-				},
-				VolumeMounts: []corev1.VolumeMount{
-					{
-						Name:      model.EntrypointVolumeMountName,
-						MountPath: model.EntrypointVolumeMountPath,
-						ReadOnly:  true,
-					},
 				},
 			},
 		}
@@ -118,11 +85,10 @@ func ConfigureTask(ctx context.Context, t *Task, wrd *WorkflowRunDeps, ws *nebul
 		claim := wrd.WorkflowRun.Object.Spec.TenantRef.Name + model.EntrypointVolumeClaimSuffixReadOnlyMany
 		Annotate(&t.Object.ObjectMeta, model.RelayControllerVolumeClaimAnnotation, claim)
 	} else {
-
 		step := tektonv1beta1.Step{
 			Container: corev1.Container{
 				Name:            "step",
-				Image:           image,
+				Image:           i,
 				ImagePullPolicy: corev1.PullAlways,
 				Env: []corev1.EnvVar{
 					{
@@ -230,23 +196,4 @@ func ConfigureTasks(ctx context.Context, ts *Tasks) error {
 	}
 
 	return nil
-}
-
-func imageData(ref name.Reference, img v1.Image) ([]string, []string, name.Digest, error) {
-	digest, err := img.Digest()
-	if err != nil {
-		return nil, nil, name.Digest{}, err
-	}
-
-	cfg, err := img.ConfigFile()
-	if err != nil {
-		return nil, nil, name.Digest{}, err
-	}
-
-	d, err := name.NewDigest(ref.Context().String()+"@"+digest.String(), name.WeakValidation)
-	if err != nil {
-		return nil, nil, name.Digest{}, err
-	}
-
-	return cfg.Config.Entrypoint, cfg.Config.Cmd, d, nil
 }

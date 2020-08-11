@@ -10,11 +10,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-const (
-	EntrypointAdmissionResponseAlreadyModified = "Entrypoint admission: already modified"
-	EntrypointAdmissionResponseNotRequired     = "Entrypoint admission: not required"
-)
-
 type EntrypointHandler struct {
 	decoder *admission.Decoder
 }
@@ -29,35 +24,72 @@ func (eh *EntrypointHandler) Handle(ctx context.Context, req admission.Request) 
 	}
 
 	if claim, ok := pod.ObjectMeta.GetAnnotations()[model.RelayControllerVolumeClaimAnnotation]; ok {
-		if pod.Spec.Volumes == nil {
-			pod.Spec.Volumes = make([]corev1.Volume, 0)
+		cs := make([]corev1.Container, 0)
+
+		updated := false
+		for _, c := range pod.Spec.Containers {
+			hasVolumeMount := false
+			for _, vm := range c.VolumeMounts {
+				if vm.Name == model.EntrypointVolumeMountName {
+					hasVolumeMount = true
+					break
+				}
+			}
+
+			if !hasVolumeMount {
+				c.VolumeMounts = append(c.VolumeMounts, corev1.VolumeMount{
+					Name:      model.EntrypointVolumeMountName,
+					MountPath: model.EntrypointVolumeMountPath,
+					ReadOnly:  true,
+				})
+
+				updated = true
+			}
+
+			cs = append(cs, c)
 		}
 
+		if updated {
+			pod.Spec.Containers = cs
+		}
+
+		hasVolume := false
 		for _, volume := range pod.Spec.Volumes {
 			if volume.Name == model.EntrypointVolumeMountName {
-				return admission.Allowed(EntrypointAdmissionResponseAlreadyModified)
+				hasVolume = true
+				break
 			}
 		}
 
-		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
-			Name: model.EntrypointVolumeMountName,
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: claim,
-					ReadOnly:  true,
-				},
-			},
-		})
+		if !hasVolume {
+			if pod.Spec.Volumes == nil {
+				pod.Spec.Volumes = make([]corev1.Volume, 0)
+			}
 
-		b, err := json.Marshal(pod)
-		if err != nil {
-			return admission.Errored(http.StatusInternalServerError, err)
+			pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
+				Name: model.EntrypointVolumeMountName,
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: claim,
+						ReadOnly:  true,
+					},
+				},
+			})
+
+			updated = true
 		}
 
-		return admission.PatchResponseFromRaw(req.Object.Raw, b)
+		if updated {
+			b, err := json.Marshal(pod)
+			if err != nil {
+				return admission.Errored(http.StatusInternalServerError, err)
+			}
+
+			return admission.PatchResponseFromRaw(req.Object.Raw, b)
+		}
 	}
 
-	return admission.Allowed(EntrypointAdmissionResponseNotRequired)
+	return admission.Allowed("")
 }
 
 func (eh *EntrypointHandler) InjectDecoder(d *admission.Decoder) error {

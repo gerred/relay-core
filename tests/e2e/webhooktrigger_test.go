@@ -552,7 +552,7 @@ func TestWebhookTriggerKnativeRevisionsWithTenantVolumeClaim(t *testing.T) {
 		t.SkipNow()
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	WithConfig(t, ctx, []ConfigOption{
@@ -566,10 +566,8 @@ func TestWebhookTriggerKnativeRevisionsWithTenantVolumeClaim(t *testing.T) {
 		defer s.Close()
 
 		testutil.WithServiceBoundToHostHTTP(t, ctx, e2e.RESTConfig, e2e.Interface, s.URL, metav1.ObjectMeta{Namespace: cfg.Namespace.GetName()}, func(caPEM []byte, svc *corev1.Service) {
-			// Set up webhook configuration in API server.
 			handler := &admissionregistrationv1beta1.MutatingWebhookConfiguration{
 				TypeMeta: metav1.TypeMeta{
-					// Required for conversion during install, below.
 					APIVersion: admissionregistrationv1beta1.SchemeGroupVersion.Identifier(),
 					Kind:       "MutatingWebhookConfiguration",
 				},
@@ -617,8 +615,6 @@ func TestWebhookTriggerKnativeRevisionsWithTenantVolumeClaim(t *testing.T) {
 				},
 			}
 
-			// Patch instead of Create because this object is cluster-scoped
-			// so we want to overwrite previous test attempts.
 			require.NoError(t, e2e.ControllerRuntimeClient.Patch(ctx, handler, client.Apply, client.ForceOwnership, client.FieldOwner("relay-e2e")))
 			defer func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -627,7 +623,6 @@ func TestWebhookTriggerKnativeRevisionsWithTenantVolumeClaim(t *testing.T) {
 				assert.NoError(t, e2e.ControllerRuntimeClient.Delete(ctx, handler))
 			}()
 
-			// Set a secret and connection for this webhook trigger to look up.
 			cfg.Vault.SetSecret(t, "my-tenant-id", "foo", "Hello")
 			cfg.Vault.SetConnection(t, "my-domain-id", "aws", "test", map[string]string{
 				"accessKeyID":     "AKIA123456789",
@@ -673,7 +668,6 @@ func TestWebhookTriggerKnativeRevisionsWithTenantVolumeClaim(t *testing.T) {
 			}
 			CreateAndWaitForTenant(t, ctx, tn)
 
-			// Create a trigger.
 			wt := &relayv1beta1.WebhookTrigger{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "my-trigger",
@@ -711,11 +705,8 @@ func TestWebhookTriggerKnativeRevisionsWithTenantVolumeClaim(t *testing.T) {
 			}
 			require.NoError(t, e2e.ControllerRuntimeClient.Create(ctx, wt))
 
-			// Issue a request to spin up a pod.
-			code, stdout, stderr := waitForWebhookTriggerResponse(t, ctx, wt)
-			fmt.Println(code, stdout, stderr)
+			assertWebhookTriggerResponseContains(t, ctx, "Hello, Relay!", wt)
 
-			// Pull the pod and get its IP.
 			pod := &corev1.Pod{}
 			require.NoError(t, retry.Retry(ctx, 500*time.Millisecond, func() *retry.RetryError {
 				pods := &corev1.PodList{}

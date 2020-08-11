@@ -4,10 +4,12 @@ const (
 	DefaultImage = "alpine:latest"
 
 	EntrypointCommand                        = "entrypoint"
+	EntrypointCommandFlag                    = "-entrypoint"
+	EntrypointCommandArgSeparator            = "--"
 	EntrypointVolumeMountName                = "entrypoint"
 	EntrypointVolumeMountPath                = "/data"
-	EntrypointVolumeClaimSuffixReadWriteOnce = "-volume-rwo"
 	EntrypointVolumeClaimSuffixReadOnlyMany  = "-volume-rox"
+	EntrypointVolumeClaimSuffixReadWriteOnce = "-volume-rwo"
 )
 
 const (

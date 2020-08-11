@@ -2,10 +2,12 @@ package obj
 
 import (
 	"context"
+	"path"
 
 	relayv1beta1 "github.com/puppetlabs/relay-core/pkg/apis/relay.sh/v1beta1"
 	"github.com/puppetlabs/relay-core/pkg/authenticate"
 	"github.com/puppetlabs/relay-core/pkg/model"
+	"github.com/puppetlabs/relay-core/pkg/util/image"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	servingv1 "knative.dev/serving/pkg/apis/serving/v1"
@@ -118,16 +120,16 @@ func ConfigureKnativeService(ctx context.Context, s *KnativeService, wtd *Webhoo
 		},
 	}
 
-	image := wtd.WebhookTrigger.Object.Spec.Image
-	if image == "" {
+	i := wtd.WebhookTrigger.Object.Spec.Image
+	if i == "" {
 		// Theoretically someone could write some socat action and use the
 		// Alpine image, so we leave this here for consistency.
-		image = model.DefaultImage
+		i = model.DefaultImage
 	}
 
 	container := corev1.Container{
 		Name:            wtd.WebhookTrigger.Object.Name,
-		Image:           image,
+		Image:           i,
 		ImagePullPolicy: corev1.PullAlways,
 		Env: []corev1.EnvVar{
 			{
@@ -167,12 +169,22 @@ func ConfigureKnativeService(ctx context.Context, s *KnativeService, wtd *Webhoo
 		}
 		container.Command = []string{"/var/run/puppet/relay/config/input-script"}
 	} else {
-		if command := wtd.WebhookTrigger.Object.Spec.Command; command != "" {
-			container.Command = []string{command}
-		}
+		if wtd.Tenant.Object.Spec.ToolInjection.VolumeClaimTemplate != nil {
+			ep, err := image.ImageEntrypoint(i, []string{wtd.WebhookTrigger.Object.Spec.Command}, wtd.WebhookTrigger.Object.Spec.Args)
+			if err != nil {
+				return err
+			}
 
-		if args := wtd.WebhookTrigger.Object.Spec.Args; len(args) > 0 {
-			container.Args = args
+			container.Command = []string{path.Join(model.EntrypointVolumeMountPath, model.EntrypointCommand)}
+			container.Args = ep
+		} else {
+			if command := wtd.WebhookTrigger.Object.Spec.Command; command != "" {
+				container.Command = []string{command}
+			}
+
+			if args := wtd.WebhookTrigger.Object.Spec.Args; len(args) > 0 {
+				container.Args = args
+			}
 		}
 	}
 
