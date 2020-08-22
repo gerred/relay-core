@@ -2,8 +2,10 @@ package obj
 
 import (
 	"context"
+	"path"
 
 	nebulav1 "github.com/puppetlabs/relay-core/pkg/apis/nebula.puppet.com/v1"
+	"github.com/puppetlabs/relay-core/pkg/entrypoint"
 	"github.com/puppetlabs/relay-core/pkg/model"
 	tektonv1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -39,48 +41,88 @@ func NewTask(key client.ObjectKey) *Task {
 }
 
 func ConfigureTask(ctx context.Context, t *Task, wrd *WorkflowRunDeps, ws *nebulav1.WorkflowStep) error {
-	image := ws.Image
-	if image == "" {
-		image = model.DefaultImage
+	i := ws.Image
+	if i == "" {
+		i = model.DefaultImage
 	}
 
-	step := tektonv1beta1.Step{
-		Container: corev1.Container{
-			Name:            "step",
-			Image:           image,
-			ImagePullPolicy: corev1.PullAlways,
-			Env: []corev1.EnvVar{
-				{
-					Name:  "METADATA_API_URL",
-					Value: wrd.MetadataAPIURL.String(),
+	// TODO Reference the tool injection from the tenant (once this is available)
+	// For now, the only reason we'll add a tenant reference is to enable entrypoint handling
+	if wrd.WorkflowRun.Object.Spec.TenantRef != nil {
+		ep, err := entrypoint.ImageEntrypoint(i, []string{ws.Command}, ws.Args)
+		if err != nil {
+			return err
+		}
+
+		step := tektonv1beta1.Step{
+			Container: corev1.Container{
+				Name:            "step",
+				Image:           i,
+				ImagePullPolicy: corev1.PullAlways,
+				Command:         []string{path.Join(model.ToolInjectionMountPath, ep.Entrypoint)},
+				Args:            ep.Args,
+				Env: []corev1.EnvVar{
+					{
+						Name:  "METADATA_API_URL",
+						Value: wrd.MetadataAPIURL.String(),
+					},
+				},
+				SecurityContext: &corev1.SecurityContext{
+					// We can't use RunAsUser et al. here because they don't allow write
+					// access to the container filesystem. Eventually, we'll use gVisor
+					// to protect us here.
+					AllowPrivilegeEscalation: func(b bool) *bool { return &b }(false),
 				},
 			},
-			SecurityContext: &corev1.SecurityContext{
-				// We can't use RunAsUser et al. here because they don't allow write
-				// access to the container filesystem. Eventually, we'll use gVisor
-				// to protect us here.
-				AllowPrivilegeEscalation: func(b bool) *bool { return &b }(false),
-			},
-		},
-	}
+		}
 
-	if len(ws.Input) > 0 {
-		step.Script = model.ScriptForInput(ws.Input)
+		if err := wrd.AnnotateStepToken(ctx, &t.Object.ObjectMeta, ws); err != nil {
+			return err
+		}
+
+		t.Object.Spec.Steps = []tektonv1beta1.Step{step}
+
+		claim := wrd.WorkflowRun.Object.Spec.TenantRef.Name + model.ToolInjectionVolumeClaimSuffixReadOnlyMany
+		Annotate(&t.Object.ObjectMeta, model.RelayControllerToolsVolumeClaimAnnotation, claim)
 	} else {
-		if len(ws.Command) > 0 {
-			step.Container.Command = []string{ws.Command}
+		step := tektonv1beta1.Step{
+			Container: corev1.Container{
+				Name:            "step",
+				Image:           i,
+				ImagePullPolicy: corev1.PullAlways,
+				Env: []corev1.EnvVar{
+					{
+						Name:  "METADATA_API_URL",
+						Value: wrd.MetadataAPIURL.String(),
+					},
+				},
+				SecurityContext: &corev1.SecurityContext{
+					// We can't use RunAsUser et al. here because they don't allow write
+					// access to the container filesystem. Eventually, we'll use gVisor
+					// to protect us here.
+					AllowPrivilegeEscalation: func(b bool) *bool { return &b }(false),
+				},
+			},
 		}
 
-		if len(ws.Args) > 0 {
-			step.Container.Args = ws.Args
+		if len(ws.Input) > 0 {
+			step.Script = model.ScriptForInput(ws.Input)
+		} else {
+			if len(ws.Command) > 0 {
+				step.Container.Command = []string{ws.Command}
+			}
+
+			if len(ws.Args) > 0 {
+				step.Container.Args = ws.Args
+			}
 		}
-	}
 
-	if err := wrd.AnnotateStepToken(ctx, &t.Object.ObjectMeta, ws); err != nil {
-		return err
-	}
+		if err := wrd.AnnotateStepToken(ctx, &t.Object.ObjectMeta, ws); err != nil {
+			return err
+		}
 
-	t.Object.Spec.Steps = []tektonv1beta1.Step{step}
+		t.Object.Spec.Steps = []tektonv1beta1.Step{step}
+	}
 
 	return nil
 }
